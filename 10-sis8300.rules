@@ -1,0 +1,4 @@
+SUBSYSTEM=="sis8300",	RUN+="/export/doocs/server/doocs stop sis8300_server"
+SUBSYSTEM=="sis8300",	MODE="0666"
+KERNEL=="sis8300s1",	SYMLINK="sis8300-0"
+
