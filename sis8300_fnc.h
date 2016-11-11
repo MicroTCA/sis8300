@@ -21,7 +21,6 @@
 #define SIS8300_DMA_SYZE                  4096
 
 struct sis8300_dev {
-    int                              brd_num;
     struct timeval          dma_start_time;
     struct timeval          dma_stop_time;
     int                              waitFlag;

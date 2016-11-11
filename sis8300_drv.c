@@ -15,8 +15,6 @@ MODULE_VERSION("5.0.0");
 MODULE_LICENSE("Dual BSD/GPL");
 
 pciedev_cdev     *sis8300_cdev_m = 0;
-sis8300_dev       *sis8300_dev_p[PCIEDEV_NR_DEVS];
-sis8300_dev       *sis8300_dev_pp;
 
 static int        sis8300_open( struct inode *inode, struct file *filp );
 static int        sis8300_release(struct inode *inode, struct file *filp);
@@ -82,45 +80,45 @@ static int __devinit sis8300_probe(struct pci_dev *dev, const struct pci_device_
 #endif
 {
     int result                = 0;
-    int tmp_brd_num  = -1;
     u32 tmp_info          = 0;
     pciedev_dev       *sis8300_pcie_dev;
+    sis8300_dev       *sis8300_dev_pp;
     void*                   address;
     
     printk(KERN_ALERT "SIS8300-PCIEDEV_PROBE CALLED \n");
-    result = pciedev_probe_exp(dev, id, &sis8300_fops, sis8300_cdev_m, SIS8300DEVNAME, &tmp_brd_num);
-    printk(KERN_ALERT "SIS8300-PCIEDEV_PROBE_EXP CALLED  FOR BOARD %i result %i\n", tmp_brd_num, result);
-    if(!(sis8300_cdev_m->pciedev_dev_m[tmp_brd_num]->pciedev_all_mems)){
-        printk(KERN_ALERT "SIS8300-PCIEDEV_PROBE CALLED; NO BARs \n");
-        result = pciedev_remove_exp(dev,  sis8300_cdev_m, SIS8300DEVNAME, &tmp_brd_num);
-        printk(KERN_ALERT "SIS8300-PCIEDEV_REMOVE_EXP CALLED  FOR SLOT %i\n", tmp_brd_num);  
-        return -ENOMEM;
-    }
+    result = pciedev_probe_exp(dev, id, &sis8300_fops, sis8300_cdev_m, &sis8300_pcie_dev);
+    printk(KERN_ALERT "SIS8300-PCIEDEV_PROBE_EXP CALLED  FOR BOARD result %i\n", result);
     /*if board has created we will create our structure and pass it to pcedev_dev*/
     if(!result){
-        printk(KERN_ALERT "SIS8300-PCIEDEV_PROBE_EXP CREATING CURRENT STRUCTURE FOR BOARD %i\n", tmp_brd_num);
-        sis8300_pcie_dev = sis8300_cdev_m->pciedev_dev_m[tmp_brd_num];
+        
+        if(!(sis8300_pcie_dev->pciedev_all_mems)){
+            printk(KERN_ALERT "SIS8300-PCIEDEV_PROBE CALLED; NO BARs \n");
+            result = pciedev_remove_exp(sis8300_pcie_dev);
+            printk(KERN_ALERT "SIS8300-PCIEDEV_REMOVE_EXP CALLED  FOR SLOT %i\n", sis8300_pcie_dev->brd_num);  
+            return -ENOMEM;
+        }
+ 
+        printk(KERN_ALERT "SIS8300-PCIEDEV_PROBE_EXP CREATING CURRENT STRUCTURE FOR BOARD %i\n", sis8300_pcie_dev->brd_num);
+        // allocate private data
         sis8300_dev_pp = kzalloc(sizeof(sis8300_dev), GFP_KERNEL);
         if(!sis8300_dev_pp){
                 return -ENOMEM;
         }
         printk(KERN_ALERT "SIS8300-PCIEDEV_PROBE CALLED; CURRENT STRUCTURE CREATED \n");
-        sis8300_dev_p[tmp_brd_num] = sis8300_dev_pp;
-        sis8300_dev_pp->brd_num      = tmp_brd_num;
-        sis8300_dev_pp->parent_dev  = sis8300_cdev_m->pciedev_dev_m[tmp_brd_num];
+        sis8300_dev_pp->parent_dev  = sis8300_pcie_dev;
         init_waitqueue_head(&sis8300_dev_pp->waitDMA);
-        pciedev_set_drvdata(sis8300_cdev_m->pciedev_dev_m[tmp_brd_num], sis8300_dev_p[tmp_brd_num]);
-        pciedev_setup_interrupt(sis8300_interrupt, sis8300_cdev_m->pciedev_dev_m[tmp_brd_num], SIS8300DEVNAME); 
+        pciedev_set_drvdata(sis8300_pcie_dev, sis8300_dev_pp);
+        pciedev_setup_interrupt(sis8300_interrupt, sis8300_pcie_dev, SIS8300DEVNAME); 
         
         /*****Switch ON USER_LED*****/
-        //address = sis8300_cdev_m->pciedev_dev_m[tmp_brd_num]->memmory_base0;
+        //address = sis8300_pcie_dev->memmory_base0;
         address = pciedev_get_baraddress(BAR0, sis8300_pcie_dev);
         iowrite32(0x1, (address + SIS8300_USER_CONTROL_STATUS_REG*4));
         smp_wmb();
         /*Collect INFO*/
         tmp_info = ioread32(address + 0x0);
         smp_rmb();
-        sis8300_cdev_m->pciedev_dev_m[tmp_brd_num]->brd_info_list.PCIEDEV_BOARD_ID = tmp_info;
+        sis8300_pcie_dev->brd_info_list.PCIEDEV_BOARD_ID = tmp_info;
         
         sis8300_dev_pp->fpga_1_gb =0;
         sis8300_dev_pp->dual_optical_interface = 0;
@@ -141,12 +139,12 @@ static int __devinit sis8300_probe(struct pci_dev *dev, const struct pci_device_
         sis8300_dev_pp->trigger_block_enable = tmp_info & 0x1;
         if(sis8300_dev_pp->fpga_1_gb ) sis8300_dev_pp->sis8300_mem_max_size = 1073741824;
 /*
-        sis8300_cdev_m->pciedev_dev_m[tmp_brd_num]->brd_info_list.PCIEDEV_BOARD_ID = (tmp_info >> 16) & 0xFFFF;
-        sis8300_cdev_m->pciedev_dev_m[tmp_brd_num]->brd_info_list.PCIEDEV_BOARD_VERSION = (tmp_info >> 8)  & 0xFFFF;
+        sis8300_pcie_dev->brd_info_list.PCIEDEV_BOARD_ID = (tmp_info >> 16) & 0xFFFF;
+        sis8300_pcie_dev->brd_info_list.PCIEDEV_BOARD_VERSION = (tmp_info >> 8)  & 0xFFFF;
 */
         tmp_info = ioread32(address + 0x4);
         smp_rmb();
-        sis8300_cdev_m->pciedev_dev_m[tmp_brd_num]->brd_info_list.PCIEDEV_HW_VERSION = tmp_info & 0xFFFF;
+        sis8300_pcie_dev->brd_info_list.PCIEDEV_HW_VERSION = tmp_info & 0xFFFF;
      }
     return result;
 }
@@ -157,19 +155,30 @@ static void sis8300_remove(struct pci_dev *dev)
 static void __devexit sis8300_remove(struct pci_dev *dev)
 #endif
 {
-    int result               = 0;
-    int tmp_slot_num = -1;
-    int tmp_brd_num = -1;
-    printk(KERN_ALERT "SIS8300-REMOVE CALLED\n");
-    tmp_brd_num =pciedev_get_brdnum(dev);
-    printk(KERN_ALERT "SIS8300-REMOVE CALLED FOR BOARD %i\n", tmp_brd_num);
-    /* clean up any allocated resources and stuff here */
-    kfree(sis8300_dev_p[tmp_brd_num]);
-    /*now we can call pciedev_remove_exp to clean all standard allocated resources
-    will clean all interrupts if it seted 
-    */
-    result = pciedev_remove_exp(dev,  sis8300_cdev_m, SIS8300DEVNAME, &tmp_slot_num);
-    printk(KERN_ALERT "SIS8300-PCIEDEV_REMOVE_EXP CALLED  FOR SLOT %i\n", tmp_slot_num);  
+    int                  result       = 0;
+    sis8300_dev         *sis8300_dev_pp;
+    struct pciedev_dev  *sis8300_pcie_dev;
+
+    sis8300_pcie_dev = pciedev_get_pciedata(dev);
+    if( sis8300_pcie_dev != NULL ) {
+        int brd_num;
+        sis8300_dev_pp = pciedev_get_drvdata(sis8300_pcie_dev);
+        brd_num = sis8300_pcie_dev->brd_num;
+        printk(KERN_ALERT "SIS8300-REMOVE CALLED BOARD %i - PRIVATE DATA OK\n", brd_num );
+
+        /*now we can call pciedev_remove_exp to clean all standard allocated resources
+        will clean all interrupts if it seted 
+        */
+        result = pciedev_remove_exp(sis8300_pcie_dev);
+        printk(KERN_ALERT "SIS8300-PCIEDEV_REMOVE_EXP CALLED, brd=%i result=%d\n", brd_num, result);
+
+        /* clean up any allocated resources and stuff here */
+        kfree(sis8300_dev_pp);
+        
+    } else {
+        printk(KERN_ALERT "SIS8300-REMOVE - PRIVATE DATA NOT FOUND \n");
+    }
+ 
 }
 
 /****************************************************************************************/
@@ -220,23 +229,20 @@ static ssize_t sis8300_write(struct file *filp, const char __user *buf, size_t c
 static long  sis8300_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
     long result = 0;
-    
-    if (_IOC_TYPE(cmd) == PCIEDOOCS_IOC){
-        if (_IOC_NR(cmd) <= PCIEDOOCS_IOC_MAXNR && _IOC_NR(cmd) >= PCIEDOOCS_IOC_MINNR) {
+
+    if (_IOC_TYPE(cmd) == PCIEDOOCS_IOC) {
+        int icode = _IOC_NR(cmd);
+        if (        (icode <= PCIEDOOCS_IOC_MAXNR)     && (icode >= PCIEDOOCS_IOC_MINNR) ) {
             result = pciedev_ioctl_exp(filp, &cmd, &arg, sis8300_cdev_m);
-        }else{
-            if (_IOC_NR(cmd) <= PCIEDOOCS_IOC_DMA_MAXNR && _IOC_NR(cmd) >= PCIEDOOCS_IOC_DMA_MINNR) {
-                result = sis8300_ioctl_dma(filp, &cmd, &arg);
-            }else{
-                if (_IOC_NR(cmd) <= SIS8300_IOC_MAXNR && _IOC_NR(cmd) >= SIS8300_IOC_MINNR) {
-                        result = sis8300_ioctl_dma(filp, &cmd, &arg);
-                    }else{
-                        return -ENOTTY;
-                    }
-            }
+        } else if ( (icode <= PCIEDOOCS_IOC_DMA_MAXNR) && (icode >= PCIEDOOCS_IOC_DMA_MINNR) ) {
+            result = sis8300_ioctl_dma(filp, &cmd, &arg);
+        } else if ( (icode <= SIS8300_IOC_MAXNR)       && (icode >= SIS8300_IOC_MINNR) ) {
+            result = sis8300_ioctl_dma(filp, &cmd, &arg);
+        } else {
+            return -ENOTTY;
         }
-    }else{
-         return -ENOTTY;
+    } else {
+        return -ENOTTY;
     }
     return result;
 }
