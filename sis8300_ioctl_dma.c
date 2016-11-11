@@ -1449,6 +1449,7 @@ long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long
             tmp_source_address = tmp_dma_offset;
             if (copy_from_user(pWriteBuf, ((u_int*)arg + DMA_DATA_OFFSET), (size_t)length)) {
                 retval = -EFAULT;
+                pci_unmap_single(pdev, pTmpDmaHandle, tmp_dma_trns_size, PCI_DMA_TODEVICE);
                 free_pages((ulong)pWriteBuf, (ulong)sis8300dev->dma_page_order);
                 mutex_unlock(&dev->dev_mut);
                 return retval;
