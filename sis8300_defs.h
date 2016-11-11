@@ -45,7 +45,7 @@ typedef struct t_sis8300_reg{
 
 /* Use 'o' as magic number */
 
-#define SIS8300_IOC           			'0'
+#define SIS8300_IOC                 PCIEDOOCS_IOC
 #define SIS8300_PHYSICAL_SLOT       _IOWR(SIS8300_IOC, 20, int)
 #define SIS8300_REG_READ            _IOWR(SIS8300_IOC, 21, int)
 #define SIS8300_REG_WRITE           _IOWR(SIS8300_IOC, 22, int)
