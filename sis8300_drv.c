@@ -41,11 +41,7 @@ MODULE_DEVICE_TABLE(pci, sis8300_ids);
 /*
  * The top-half interrupt handler.
  */
-#if LINUX_VERSION_CODE < 0x20613 // irq_handler_t has changed in 2.6.19
-static irqreturn_t sis8300_interrupt(int irq, void *dev_id, struct pt_regs *regs)
-#else
-static irqreturn_t sis8300_interrupt(int irq, void *dev_id)
-#endif
+static irqreturn_t sis8300_interrupt(int irq, void *dev_id UPKCOMPAT_IHARGPOS(regs) )
 {
     uint32_t intreg = 0;
     void*                   address;
@@ -73,11 +69,7 @@ static irqreturn_t sis8300_interrupt(int irq, void *dev_id)
     return IRQ_HANDLED;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,8,0)
-    static int sis8300_probe(struct pci_dev *dev, const struct pci_device_id *id)
-#else 
-static int __devinit sis8300_probe(struct pci_dev *dev, const struct pci_device_id *id)
-#endif
+static int UPKCOMPAT_INIT sis8300_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
     int result                = 0;
     u32 tmp_info          = 0;
@@ -86,14 +78,14 @@ static int __devinit sis8300_probe(struct pci_dev *dev, const struct pci_device_
     void*                   address;
     
     printk(KERN_ALERT "SIS8300-PCIEDEV_PROBE CALLED \n");
-    result = pciedev_probe_exp(dev, id, &sis8300_fops, sis8300_cdev_m, &sis8300_pcie_dev);
+    result = pciedev_probe2_exp(dev, id, &sis8300_fops, sis8300_cdev_m, &sis8300_pcie_dev);
     printk(KERN_ALERT "SIS8300-PCIEDEV_PROBE_EXP CALLED  FOR BOARD result %i\n", result);
     /*if board has created we will create our structure and pass it to pcedev_dev*/
     if(!result){
         
         if(!(sis8300_pcie_dev->pciedev_all_mems)){
             printk(KERN_ALERT "SIS8300-PCIEDEV_PROBE CALLED; NO BARs \n");
-            result = pciedev_remove_exp(sis8300_pcie_dev);
+            result = pciedev_remove2_exp(sis8300_pcie_dev);
             printk(KERN_ALERT "SIS8300-PCIEDEV_REMOVE_EXP CALLED  FOR SLOT %i\n", sis8300_pcie_dev->brd_num);  
             return -ENOMEM;
         }
@@ -108,7 +100,7 @@ static int __devinit sis8300_probe(struct pci_dev *dev, const struct pci_device_
         sis8300_dev_pp->parent_dev  = sis8300_pcie_dev;
         init_waitqueue_head(&sis8300_dev_pp->waitDMA);
         pciedev_set_drvdata(sis8300_pcie_dev, sis8300_dev_pp);
-        pciedev_setup_interrupt(sis8300_interrupt, sis8300_pcie_dev, SIS8300DEVNAME); 
+        pciedev_setup_interrupt_exp(sis8300_interrupt, sis8300_pcie_dev);
         
         /*****Switch ON USER_LED*****/
         //address = sis8300_pcie_dev->memmory_base0;
@@ -149,28 +141,25 @@ static int __devinit sis8300_probe(struct pci_dev *dev, const struct pci_device_
     return result;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,8,0)
-static void sis8300_remove(struct pci_dev *dev)
-#else
-static void __devexit sis8300_remove(struct pci_dev *dev)
-#endif
+static void UPKCOMPAT_EXIT sis8300_remove(struct pci_dev *dev)
 {
     int                  result       = 0;
-    sis8300_dev         *sis8300_dev_pp;
     struct pciedev_dev  *sis8300_pcie_dev;
 
     sis8300_pcie_dev = pciedev_get_pciedata(dev);
     if( sis8300_pcie_dev != NULL ) {
-        int brd_num;
+        sis8300_dev *sis8300_dev_pp;
+        int brd_num, slot_num;
         sis8300_dev_pp = pciedev_get_drvdata(sis8300_pcie_dev);
         brd_num = sis8300_pcie_dev->brd_num;
-        printk(KERN_ALERT "SIS8300-REMOVE CALLED BOARD %i - PRIVATE DATA OK\n", brd_num );
+        slot_num = sis8300_pcie_dev->slot_num;
+        printk(KERN_ALERT "SIS8300-REMOVE CALLED brd %i slot %i - PRIVATE DATA OK\n", brd_num, slot_num );
 
         /*now we can call pciedev_remove_exp to clean all standard allocated resources
         will clean all interrupts if it seted 
         */
-        result = pciedev_remove_exp(sis8300_pcie_dev);
-        printk(KERN_ALERT "SIS8300-PCIEDEV_REMOVE_EXP CALLED, brd=%i result=%d\n", brd_num, result);
+        result = pciedev_remove2_exp(sis8300_pcie_dev);
+        printk(KERN_ALERT "SIS8300-PCIEDEV_REMOVE_EXP CALLED, brd=%i slot %i result=%d\n", brd_num, slot_num, result);
 
         /* clean up any allocated resources and stuff here */
         kfree(sis8300_dev_pp);
@@ -182,21 +171,12 @@ static void __devexit sis8300_remove(struct pci_dev *dev)
 }
 
 /****************************************************************************************/
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,8,0)
 static struct pci_driver pci_sis8300_driver = {
     .name       = SIS8300DEVNAME,
     .id_table   = sis8300_ids,
     .probe      = sis8300_probe,
-    .remove   = sis8300_remove,
+    .remove   = UPKCOMPAT_EXIT_P(sis8300_remove),
 };
-#else
-static struct pci_driver pci_sis8300_driver = {
-    .name       = SIS8300DEVNAME,
-    .id_table   = sis8300_ids,
-    .probe      = sis8300_probe,
-    .remove   = __devexit_p(sis8300_remove),
-};
-#endif
 
 static int sis8300_open( struct inode *inode, struct file *filp )
 {
