@@ -27,7 +27,6 @@ struct sis8300_dev {
     u32                            dev_dma_size;
     u32                            dma_page_num;
     int                              dma_offset;
-    int                              dma_page_order;
     wait_queue_head_t  waitDMA;
     struct pciedev_dev  *parent_dev;
     int                          sis8300_mem_max_size;
