@@ -96,6 +96,16 @@ static int UPKCOMPAT_INIT sis8300_probe(struct pci_dev *dev, const struct pci_de
         if(!sis8300_dev_pp){
                 return -ENOMEM;
         }
+        
+        sis8300_dev_pp->perflog = PerfLog_create( 512 );
+        if( !(sis8300_dev_pp->perflog) )
+        {
+            printk(KERN_ALERT "SIS8300-PCIEDEV_PROBE_EXP No memory for perflog\n" );
+            kfree( sis8300_dev_pp );
+            return -ENOMEM;
+        }
+        
+        
         printk(KERN_ALERT "SIS8300-PCIEDEV_PROBE CALLED; CURRENT STRUCTURE CREATED \n");
         sis8300_dev_pp->parent_dev  = sis8300_pcie_dev;
         init_waitqueue_head(&sis8300_dev_pp->waitDMA);
@@ -162,8 +172,21 @@ static void UPKCOMPAT_EXIT sis8300_remove(struct pci_dev *dev)
         printk(KERN_ALERT "SIS8300-PCIEDEV_REMOVE_EXP CALLED, brd=%i slot %i result=%d\n", brd_num, slot_num, result);
 
         /* clean up any allocated resources and stuff here */
+        {
+            const LogEntry *e;
+            PerfLogIterator it;
+            PerfLog *p = sis8300_dev_pp->perflog;
+            printk( KERN_ALERT "timestamp_ns;logid;threadid\n" );
+            for( PerfLogIterator_start(&it, p );
+                (e = PerfLogIterator_get(&it)) != NULL;
+                PerfLogIterator_next(&it) )
+            {
+                // dont dump context, as the user has defined his own type, which we dont know how to dump
+                printk( KERN_ALERT "%llu;0x%x;0x%llx\n", RawTsToNanos(p, &(e->timestamp)), e->id, (uint64_t)(e->thread) );
+            }
+        }
+        PerfLog_destroy( sis8300_dev_pp->perflog );
         kfree(sis8300_dev_pp);
-        
     } else {
         printk(KERN_ALERT "SIS8300-REMOVE - PRIVATE DATA NOT FOUND \n");
     }

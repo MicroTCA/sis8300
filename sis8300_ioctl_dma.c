@@ -1347,7 +1347,9 @@ long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long
             //value    = HZ/1;                /* value is given in jiffies*/
             length   = tmp_dma_size;
             
+            PerfLog_put( sis8300dev->perflog, 0x300, 0 );
             pWriteBuf = dma_alloc_coherent(&pdev->dev, tmp_dma_trns_size, &pTmpDmaHandle, GFP_KERNEL | GFP_DMA );
+            PerfLog_put( sis8300dev->perflog, 0x301, 0 );
             if ( pWriteBuf == NULL )
             {
                  printk (KERN_ALERT "SIS8300_READ_DMA: Unable to allocate DMA buf size %d\n", tmp_dma_trns_size);
@@ -1409,11 +1411,17 @@ long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long
                     return EFAULT;
                 }
             }
+            
+            PerfLog_put( sis8300dev->perflog, 0x400, 0 );
             if (copy_to_user ((void *)arg, pWriteBuf, tmp_dma_size)) {
                 retval = -EFAULT;
                 printk (KERN_ALERT "SIS8300_READ_DMA: SLOT NUM %i COULD NOT COPY TO USER\n", dev->slot_num);
             }
+            PerfLog_put( sis8300dev->perflog, 0x401, 0 );
+            
+            PerfLog_put( sis8300dev->perflog, 0x500, 0 );
             dma_free_coherent( &pdev->dev, tmp_dma_trns_size, pWriteBuf, pTmpDmaHandle );
+            PerfLog_put( sis8300dev->perflog, 0x501, 0 );
             iowrite32(0xFFFFFFFF, ((void*)(address + IRQ_CLEAR*4)));
             smp_wmb();
             udelay(5);

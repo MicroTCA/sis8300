@@ -3,6 +3,7 @@
 
 #include "pciedev_io.h"
 #include "pciedev_ufn.h"
+#include <PerfLog.h>
 
 #ifndef SIS8300_NR_DEVS
 #define SIS8300_NR_DEVS 15  /* sis83000 through sis830011 */
@@ -37,6 +38,7 @@ struct sis8300_dev {
     int                          dual_channel_sampling;
     int                          ringbuffer_delay;
     int                          trigger_block_enable;
+    PerfLog                     *perflog;
 };
 typedef struct sis8300_dev sis8300_dev;
 
