@@ -11,6 +11,8 @@
 #include "sis8300_defs.h"
 #include "sis8300_reg.h"
 
+
+
 long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long *arg_p)
 {
     unsigned int     cmd;
@@ -40,7 +42,6 @@ long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long
     u_int                  tmp_step;
     u32                    tmp_data_32;
     
-    struct pci_dev*          pdev;
     struct pciedev_dev*  dev ;
     struct sis8300_dev*  sis8300dev ;
     
@@ -65,7 +66,6 @@ long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long
     
     dev                 = filp->private_data;
     sis8300dev    = (sis8300_dev   *)dev->dev_str;
-    pdev               = (dev->pciedev_pci_dev);
     minor             = dev->dev_minor;
     d_num           = dev->dev_num;	
     cur_proc       = current->group_leader->pid;
@@ -1341,15 +1341,14 @@ long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long
                 tmp_dma_trns_size    = tmp_dma_size + (tmp_dma_size%SIS8300_DMA_SYZE);
             }
             
-            //  ALEXNOTE:  -final size is tmp_dma_trns_size
-            
+
             value  = 10000*HZ/300000; /* value is given in jiffies*/
             //value    = HZ/1;                /* value is given in jiffies*/
             length   = tmp_dma_size;
             
-            PerfLog_put( sis8300dev->perflog, 0x300, 0 );
-            pWriteBuf = dma_alloc_coherent(&pdev->dev, tmp_dma_trns_size, &pTmpDmaHandle, GFP_KERNEL | GFP_DMA );
-            PerfLog_put( sis8300dev->perflog, 0x301, 0 );
+            _Profile( sis8300dev, 0x300, 0 );
+            pWriteBuf = pciedev_dma_alloc( dev, tmp_dma_trns_size, &pTmpDmaHandle );
+            _Profile( sis8300dev, 0x301, 0 );
             if ( pWriteBuf == NULL )
             {
                  printk (KERN_ALERT "SIS8300_READ_DMA: Unable to allocate DMA buf size %d\n", tmp_dma_trns_size);
@@ -1406,22 +1405,22 @@ long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long
                     iowrite32(0xFFFFFFFF, ((void*)(address + IRQ_CLEAR*4)));
                     smp_wmb();
                     udelay(5);
-                    dma_free_coherent( &pdev->dev, tmp_dma_trns_size, pWriteBuf, pTmpDmaHandle );
+                    pciedev_dma_free( dev, tmp_dma_trns_size, pWriteBuf, pTmpDmaHandle );
                     mutex_unlock(&dev->dev_mut);
                     return EFAULT;
                 }
             }
             
-            PerfLog_put( sis8300dev->perflog, 0x400, 0 );
+            _Profile( sis8300dev, 0x400, 0 );
             if (copy_to_user ((void *)arg, pWriteBuf, tmp_dma_size)) {
                 retval = -EFAULT;
                 printk (KERN_ALERT "SIS8300_READ_DMA: SLOT NUM %i COULD NOT COPY TO USER\n", dev->slot_num);
             }
-            PerfLog_put( sis8300dev->perflog, 0x401, 0 );
+            _Profile( sis8300dev, 0x401, 0 );
             
-            PerfLog_put( sis8300dev->perflog, 0x500, 0 );
-            dma_free_coherent( &pdev->dev, tmp_dma_trns_size, pWriteBuf, pTmpDmaHandle );
-            PerfLog_put( sis8300dev->perflog, 0x501, 0 );
+            _Profile( sis8300dev, 0x500, 0 );
+            pciedev_dma_free( dev, tmp_dma_trns_size, pWriteBuf, pTmpDmaHandle );
+            _Profile( sis8300dev, 0x501, 0 );
             iowrite32(0xFFFFFFFF, ((void*)(address + IRQ_CLEAR*4)));
             smp_wmb();
             udelay(5);
@@ -1455,7 +1454,7 @@ long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long
             }
             tmp_data_32       = ioread32(address + 0); // be safe all writes are done
             length   = tmp_dma_size;
-            pWriteBuf = dma_alloc_coherent(&pdev->dev, tmp_dma_trns_size, &pTmpDmaHandle, GFP_KERNEL | GFP_DMA );
+            pWriteBuf = pciedev_dma_alloc( dev, tmp_dma_trns_size, &pTmpDmaHandle );
             if( pWriteBuf == NULL )
             {
                  printk (KERN_ALERT "SIS8300_WRITE_DMA: Unable to allocate buf size %d\n", tmp_dma_trns_size );
@@ -1465,7 +1464,7 @@ long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long
             tmp_source_address = tmp_dma_offset;
             if (copy_from_user(pWriteBuf, ((u_int*)arg + DMA_DATA_OFFSET), (size_t)length)) {
                 retval = -EFAULT;
-                dma_free_coherent( &pdev->dev, tmp_dma_trns_size, pWriteBuf, pTmpDmaHandle );
+                pciedev_dma_free( dev, tmp_dma_trns_size, pWriteBuf, pTmpDmaHandle );
                 mutex_unlock(&dev->dev_mut);
                 return retval;
             }
@@ -1493,11 +1492,11 @@ long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long
                 iowrite32(0xFFFFFFFF, ((void*)(address + IRQ_CLEAR*4)));
                 smp_wmb();
                 udelay(2);
-                dma_free_coherent( &pdev->dev, tmp_dma_trns_size, pWriteBuf, pTmpDmaHandle );
+                pciedev_dma_free( dev, tmp_dma_trns_size, pWriteBuf, pTmpDmaHandle );
                 mutex_unlock(&dev->dev_mut);
                 return EFAULT;
             }
-            dma_free_coherent( &pdev->dev, tmp_dma_trns_size, pWriteBuf, pTmpDmaHandle );
+            pciedev_dma_free( dev, tmp_dma_trns_size, pWriteBuf, pTmpDmaHandle );
             //iowrite32(0xFFFFFFFF, ((void*)(address + IRQ_CLEAR*4)));
             smp_wmb();
             udelay(2);

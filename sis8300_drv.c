@@ -96,14 +96,16 @@ static int UPKCOMPAT_INIT sis8300_probe(struct pci_dev *dev, const struct pci_de
         if(!sis8300_dev_pp){
                 return -ENOMEM;
         }
-        
-        sis8300_dev_pp->perflog = PerfLog_create( 512 );
-        if( !(sis8300_dev_pp->perflog) )
-        {
-            printk(KERN_ALERT "SIS8300-PCIEDEV_PROBE_EXP No memory for perflog\n" );
-            kfree( sis8300_dev_pp );
-            return -ENOMEM;
-        }
+
+        #ifdef __SIS300_PROFILE
+            sis8300_dev_pp->perflog = PerfLog_create( 512 );
+            if( !(sis8300_dev_pp->perflog) )
+            {
+                printk(KERN_ALERT "SIS8300-PCIEDEV_PROBE_EXP No memory for perflog\n" );
+                kfree( sis8300_dev_pp );
+                return -ENOMEM;
+            }
+        #endif
         
         
         printk(KERN_ALERT "SIS8300-PCIEDEV_PROBE CALLED; CURRENT STRUCTURE CREATED \n");
@@ -172,6 +174,7 @@ static void UPKCOMPAT_EXIT sis8300_remove(struct pci_dev *dev)
         printk(KERN_ALERT "SIS8300-PCIEDEV_REMOVE_EXP CALLED, brd=%i slot %i result=%d\n", brd_num, slot_num, result);
 
         /* clean up any allocated resources and stuff here */
+        #ifdef __SIS300_PROFILE
         {
             const LogEntry *e;
             PerfLogIterator it;
@@ -181,11 +184,12 @@ static void UPKCOMPAT_EXIT sis8300_remove(struct pci_dev *dev)
                 (e = PerfLogIterator_get(&it)) != NULL;
                 PerfLogIterator_next(&it) )
             {
-                // dont dump context, as the user has defined his own type, which we dont know how to dump
-                printk( KERN_ALERT "%llu;0x%x;0x%llx\n", RawTsToNanos(p, &(e->timestamp)), e->id, (uint64_t)(e->thread) );
+                printk( KERN_ALERT "%llu;0x%x;0x%llx\n", 
+                    RawTsToNanos(p, &(e->timestamp)), e->id, (uint64_t)(e->thread) );
             }
+            PerfLog_destroy( p );
         }
-        PerfLog_destroy( sis8300_dev_pp->perflog );
+        #endif
         kfree(sis8300_dev_pp);
     } else {
         printk(KERN_ALERT "SIS8300-REMOVE - PRIVATE DATA NOT FOUND \n");

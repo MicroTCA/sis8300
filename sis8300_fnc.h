@@ -5,6 +5,9 @@
 #include "pciedev_ufn.h"
 #include <PerfLog.h>
 
+// uncomment to enable profiling and profile dump at driver unload
+// #define __SIS300_PROFILE
+
 #ifndef SIS8300_NR_DEVS
 #define SIS8300_NR_DEVS 15  /* sis83000 through sis830011 */
 #endif
@@ -20,6 +23,13 @@
 //#define SIS8300_DMA_MAX_SYZE         32768
 //#define SIS8300_DMA_MIN_SYZE          128
 #define SIS8300_DMA_SYZE                  4096
+
+
+#ifdef __SIS300_PROFILE
+    #define _Profile(__a, __b, __c) PerfLog_put( (__a)->perflog, (__b), (__c) )
+#else
+    #define _Profile(__a, __b, __c)
+#endif
 
 struct sis8300_dev {
     struct timeval          dma_start_time;
@@ -38,7 +48,9 @@ struct sis8300_dev {
     int                          dual_channel_sampling;
     int                          ringbuffer_delay;
     int                          trigger_block_enable;
-    PerfLog                     *perflog;
+    #ifdef __SIS300_PROFILE
+        PerfLog                 *perflog;
+    #endif
 };
 typedef struct sis8300_dev sis8300_dev;
 
