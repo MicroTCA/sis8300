@@ -55,6 +55,7 @@ long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long
     int                              io_buf_size;
     int                              time_size;
     int                              io_dma_size;
+    int                             dma_done_count;
 
     cmd                            = *cmd_p;
     arg                              = *arg_p;
@@ -1341,7 +1342,7 @@ long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long
             if((tmp_dma_size%SIS8300_DMA_SYZE)){
                 tmp_dma_trns_size    = tmp_dma_size + (tmp_dma_size%SIS8300_DMA_SYZE);
             }
-            value  = 10000*HZ/300000; /* value is given in jiffies*/
+            value  = 10000*HZ/200000; /* value is given in jiffies*/
             //value    = HZ/1;                /* value is given in jiffies*/
             length   = tmp_dma_size;
             tmp_order = get_order(tmp_dma_trns_size);
@@ -1376,24 +1377,15 @@ long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long
             if(!sis8300dev->waitFlag){
                 tmp_data_32       = ioread32((void*)(address + DMA_READ_CTRL*4)); 
                 smp_rmb();
+                 for(dma_done_count = 0; dma_done_count < 2000; ++dma_done_count){
+			                 udelay(20);
+		                	tmp_data_32 = 0;
+		                 	tmp_data_32       = ioread32((void*)(address + DMA_READ_CTRL*4)); 
+                            smp_rmb();
+			                if(!(tmp_data_32 & 0x1)) break;
+		        }
                 if(tmp_data_32 & 0x1){
                     printk (KERN_ALERT "SIS8300_READ_DMA:SLOT NUM %i NO INTERRUPT \n", dev->slot_num);
-/*
-                    tmp_data_32       = ioread32((void*)(address + SIS8300_ACQUISITION_CONTROL_STATUS_REG*4)); 
-                    printk (KERN_ALERT "SIS8300_READ_DMA:SLOT NUM %i NO INTERRUPT  ADC CONTROL %X\n", dev->slot_num, tmp_data_32);
-                    tmp_data_32       = ioread32((void*)(address + DMA_READ_SRC_ADR_LO32*4)); 
-                    printk (KERN_ALERT "SIS8300_READ_DMA:SLOT NUM %i NO INTERRUPT  SRC_ADR %X\n", dev->slot_num, tmp_data_32);
-                    tmp_data_32       = ioread32((void*)(address + DMA_READ_DST_ADR_LO32*4)); 
-                    printk (KERN_ALERT "SIS8300_READ_DMA:SLOT NUM %i NO INTERRUPT  DST_ADR_L %X\n", dev->slot_num, tmp_data_32);
-                    tmp_data_32       = ioread32((void*)(address + DMA_READ_DST_ADR_HI32*4));
-                    printk (KERN_ALERT "SIS8300_READ_DMA:SLOT NUM %i NO INTERRUPT  DST_ADR_H %X\n", dev->slot_num, tmp_data_32);
-                    tmp_data_32       = ioread32((void*)(address + DMA_READ_LEN*4)); 
-                    printk (KERN_ALERT "SIS8300_READ_DMA:SLOT NUM %i NO INTERRUPT  DMA_LEN %X\n", dev->slot_num, tmp_data_32);
-                    tmp_data_32       = ioread32((void*)(address + IRQ_ENABLE*4)); 
-                    printk (KERN_ALERT "SIS8300_READ_DMA:SLOT NUM %i NO INTERRUPT  IRQ_ENBL %X\n", dev->slot_num, tmp_data_32);
-                    tmp_data_32       = ioread32((void*)(address + DMA_READ_CTRL*4)); 
-                    printk (KERN_ALERT "SIS8300_READ_DMA:SLOT NUM %i NO INTERRUPT  DMA_RD_CTRL %X\n", dev->slot_num, tmp_data_32);
-*/
                     sis8300dev->waitFlag = 1;
                     iowrite32(0xFFFFFFFF, ((void*)(address + IRQ_CLEAR*4)));
                     smp_wmb();
@@ -1402,7 +1394,7 @@ long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long
                     free_pages((ulong)pWriteBuf, (ulong)sis8300dev->dma_page_order);
                     mutex_unlock(&dev->dev_mut);
                     return EFAULT;
-                }
+                }    
             }
             pci_unmap_single(pdev, pTmpDmaHandle, tmp_dma_trns_size, PCI_DMA_FROMDEVICE);
             if (copy_to_user ((void *)arg, pWriteBuf, tmp_dma_size)) {

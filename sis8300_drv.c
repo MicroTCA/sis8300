@@ -11,7 +11,7 @@
 
 MODULE_AUTHOR("Lyudvig Petrosyan");
 MODULE_DESCRIPTION("SIS8300 board driver");
-MODULE_VERSION("5.0.0");
+MODULE_VERSION("6.0.0");
 MODULE_LICENSE("Dual BSD/GPL");
 
 pciedev_cdev     *sis8300_cdev_m = 0;
@@ -23,6 +23,7 @@ static int        sis8300_release(struct inode *inode, struct file *filp);
 static ssize_t sis8300_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos);
 static ssize_t sis8300_write(struct file *filp, const char __user *buf, size_t count, loff_t *f_pos);
 static long     sis8300_ioctl(struct file *filp, unsigned int cmd, unsigned long arg);
+static int        sis8300_remap_mmap(struct file *filp, struct vm_area_struct *vma);
 
 struct file_operations sis8300_fops = {
     .owner                   =  THIS_MODULE,
@@ -31,6 +32,7 @@ struct file_operations sis8300_fops = {
     .unlocked_ioctl    =  sis8300_ioctl,
     .open                    =  sis8300_open,
     .release                =  sis8300_release,
+    .mmap                 = sis8300_remap_mmap,
 };
 
 static struct pci_device_id sis8300_ids[] = {
@@ -57,21 +59,20 @@ static irqreturn_t sis8300_interrupt(int irq, void *dev_id)
     
     address = pciedev_get_baraddress(BAR0, pdev);
     
-    //intreg       = ioread32((void*)pdev->memmory_base0 + IRQ_STATUS*4);
     intreg       = ioread32(address + IRQ_STATUS*4);
     smp_rmb();
      if(intreg == 0){
         return IRQ_NONE;
     }
     if(dev->waitFlag){
-        //iowrite32(intreg, ((void*)((void*)pdev->memmory_base0 + IRQ_CLEAR*4)));
         iowrite32(intreg, (address + IRQ_CLEAR*4));
         return IRQ_HANDLED;
     }
-    //iowrite32(intreg, ((void*)((void*)pdev->memmory_base0 + IRQ_CLEAR*4)));
     iowrite32(intreg, (address + IRQ_CLEAR*4));
-    dev->waitFlag = 1;
-    wake_up_interruptible(&(dev->waitDMA));
+    if(intreg & 0x3){
+		dev->waitFlag = 1;
+		wake_up_interruptible(&(dev->waitDMA));
+    }
     return IRQ_HANDLED;
 }
 
@@ -215,6 +216,15 @@ static ssize_t sis8300_write(struct file *filp, const char __user *buf, size_t c
     ssize_t         retval = 0;
     retval = pciedev_write_exp(filp, buf, count, f_pos);
     return retval;
+}
+
+static int sis8300_remap_mmap(struct file *filp, struct vm_area_struct *vma)
+{
+	ssize_t         retval = 0;
+	//printk(KERN_ALERT "PCIEDEV_MMAP CALLED\n");
+	retval =pciedev_remap_mmap_exp(filp, vma);
+	//printk(KERN_ALERT "PCIEDEV_MMAP_EXP CALLED\n");
+	return 0;
 }
 
 static long  sis8300_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
