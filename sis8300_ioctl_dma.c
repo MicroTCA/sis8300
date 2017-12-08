@@ -56,7 +56,26 @@ long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long
     int                              time_size;
     int                              io_dma_size;
     int                             dma_done_count;
-
+	
+	//PEER2PEER STAFF
+	u_int    p2p_slot;
+	u_int    p2p_bar;
+	u_int    p2p_offset;
+	u_int    p2p_phs_address;
+	u_int    p2p_phs_end;
+	u_int    p2p_phs_flag;
+	device_phys_address  p2p_phaddress;
+/*
+	struct device_phys_address  {
+		u_int    slot;
+		u_int    bar;
+		u_int    offset;
+		u_int    phs_address;
+		u_int    phs_end;
+		u_int    phs_flag;
+		u_int    reserved;
+	};
+*/
     cmd                            = *cmd_p;
     arg                              = *arg_p;
     reg_size                      = sizeof(sis8300_reg);
@@ -1309,6 +1328,7 @@ long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long
             break;
          case PCIEDEV_READ_DMA:
          case SIS8300_READ_DMA:
+			 //printk (KERN_ALERT "SIS8300_READ_DMA: START DMA READ\n");
             retval = 0;
             if (copy_from_user(&dma_data, (device_ioctrl_dma*)arg, (size_t)io_dma_size)) {
                 retval = -EFAULT;
@@ -1353,13 +1373,19 @@ long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long
             tmp_source_address = tmp_dma_offset;
             dma_sys_addr       = (u32)(pTmpDmaHandle & 0xFFFFFFFF);
             iowrite32(tmp_source_address, ((void*)(address + DMA_READ_SRC_ADR_LO32*4)));
+			
             tmp_data_32         = dma_sys_addr;
+	 //tmp_data_32         = 0xB8340004;
             iowrite32(tmp_data_32, ((void*)(address + DMA_READ_DST_ADR_LO32*4)));
             smp_wmb();
+            //printk (KERN_ALERT "SIS8300_READ_DMA: DEST ADDRESS %X\n", tmp_data_32);
             dma_sys_addr       = (u32)((pTmpDmaHandle >> 32) & 0xFFFFFFFF);
             tmp_data_32         = dma_sys_addr;
+	 //tmp_data_32         = 0xB8320000;
+	 // tmp_data_32         = 0x0;
             iowrite32(tmp_data_32, ((void*)(address + DMA_READ_DST_ADR_HI32*4)));
             smp_wmb();
+			//printk (KERN_ALERT "SIS8300_READ_DMA: DEST ADDRESS %X\n", tmp_data_32);
             iowrite32(tmp_dma_trns_size, ((void*)(address + DMA_READ_LEN*4)));
             smp_wmb();
             iowrite32(0xFFFF0000, ((void*)(address + IRQ_ENABLE*4)));
@@ -1408,6 +1434,7 @@ long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long
             break;
         case PCIEDEV_WRITE_DMA:
         case SIS8300_WRITE_DMA:
+			//printk (KERN_ALERT "SIS8300_READ_DMA: START DMA write\n");
             retval = 0;
             if (copy_from_user(&dma_data, (device_ioctrl_dma*)arg, (size_t)io_dma_size)) {
                 retval = -EFAULT;
@@ -1450,6 +1477,7 @@ long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long
             tmp_source_address = tmp_dma_offset;
             iowrite32(tmp_source_address, ((void*)(address + DMA_WRITE_DST_ADR_LO32*4)));
             dma_sys_addr       = (u32)(pTmpDmaHandle & 0xFFFFFFFF);
+	//dma_sys_addr         = 0xB8320000;
             iowrite32(dma_sys_addr, ((void*)(address + DMA_WRITE_SRC_ADR_LO32*4)));
             dma_sys_addr       = (u32)((pTmpDmaHandle >> 32) & 0xFFFFFFFF);
             iowrite32(dma_sys_addr, ((void*)(address + DMA_WRITE_SRC_ADR_HI32*4)));
@@ -1482,6 +1510,131 @@ long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long
             smp_wmb();
             udelay(2);
             break;
+			
+		case PCIEDEV_WRITE_DMA_P2P:
+		case SIS8300_WRITE_DMA_2PEER:
+			 printk (KERN_ALERT "SIS8300_WRITE_DMA_2PEER: START PEER WRITE\n");
+			 
+		/*
+			u_int    p2p_slot;
+			u_int    p2p_bar;
+			u_int    p2p_offset;
+			u_int    p2p_phs_address;
+			u_int    p2p_phs_end;
+			u_int    p2p_phs_flag;
+			device_phys_address  p2p_phaddress;
+		
+			struct device_phys_address  {
+				u_int    slot;
+				u_int    bar;
+				u_int    offset;
+				u_int    phs_address;
+				u_int    phs_end;
+				u_int    phs_flag;
+				u_int    reserved;
+			};
+		*/
+			retval = 0;
+			if (copy_from_user(&dma_data, (device_ioctrl_dma*)arg, (size_t)io_dma_size)) {
+				retval = -EFAULT;
+				mutex_unlock(&dev->dev_mut);
+				printk (KERN_ALERT "SIS8300_WRITE_DMA_2PEER: COULD NOT COPY FROM USER\n");
+				return retval;
+			}
+			tmp_dma_size           = dma_data.dma_size;
+			tmp_dma_offset        = dma_data.dma_offset;
+			tmp_cmd                    = dma_data.dma_cmd;
+			p2p_slot                      = (dma_data.dma_reserved1 >> 16) & 0xFFFF; 
+			p2p_bar                       = dma_data.dma_reserved1 & 0xFFFF;
+			p2p_offset                   = dma_data.dma_reserved2;
+           
+			sis8300dev->dev_dma_size     = tmp_dma_size;
+			 if(tmp_dma_size <= 0){
+				 printk (KERN_ALERT "SIS8300_WRITE_DMA_2PEER: SIZE 0 tmp_dma_size %d\n", tmp_dma_size);
+				 mutex_unlock(&dev->dev_mut);
+				 return EFAULT;
+			}
+            
+			tmp_data_32       = ioread32(address + 0); // be safe all writes are done
+			tmp_dma_trns_size    = tmp_dma_size;
+			if((tmp_dma_size%SIS8300_DMA_SYZE)){
+				tmp_dma_trns_size    = tmp_dma_size + (tmp_dma_size%SIS8300_DMA_SYZE);
+			}
+			value  = 10000*HZ/200000; /* value is given in jiffies*/
+			length   = tmp_dma_size;
+            
+			tmp_source_address = tmp_dma_offset;
+			iowrite32(tmp_source_address, ((void*)(address + DMA_READ_SRC_ADR_LO32*4)));
+			
+			if(tmp_cmd == 3){
+				dma_sys_addr = p2p_offset ; 
+				p2p_phs_address = p2p_offset;
+			}else{
+				p2p_phaddress.slot = p2p_slot;
+				p2p_phaddress.bar  = p2p_bar;
+				p2p_phs_address = pciedev_get_physical_address(dev, &p2p_phaddress); 
+				dma_sys_addr = p2p_phs_address + p2p_offset ; 
+			}
+			
+			
+			
+			printk (KERN_ALERT "SIS8300_WRITE_DMA_2PEER: SLOT%i BAR%i\n", p2p_slot, p2p_bar);
+			printk (KERN_ALERT "SIS8300_WRITE_DMA_2PEER: PHADDRESS %X OFFSET %X\n", p2p_phs_address, p2p_offset);
+			printk (KERN_ALERT "SIS8300_WRITE_DMA_2PEER: SIZE %X DMA_SYS_ADDRESS %X\n", tmp_dma_size, dma_sys_addr);
+			
+			
+			
+			tmp_data_32         = dma_sys_addr;
+			iowrite32(tmp_data_32, ((void*)(address + DMA_READ_DST_ADR_LO32*4)));
+			smp_wmb();
+			tmp_data_32         = dma_sys_addr;
+			tmp_data_32       = (u32)((dma_sys_addr >> 32) & 0xFFFFFFFF);
+			iowrite32(tmp_data_32, ((void*)(address + DMA_READ_DST_ADR_HI32*4)));
+			smp_wmb();
+			iowrite32(tmp_dma_trns_size, ((void*)(address + DMA_READ_LEN*4)));
+			smp_wmb();
+			iowrite32(0xFFFF0000, ((void*)(address + IRQ_ENABLE*4)));
+			smp_wmb();
+			iowrite32((1<<DMA_READ_DONE), ((void*)(address + IRQ_ENABLE*4)));
+			smp_wmb();
+			udelay(5);
+			tmp_data_32       = ioread32(address + 0); // be safe all writes are done
+			smp_rmb();
+			do_gettimeofday(&(sis8300dev->dma_start_time));
+			sis8300dev->waitFlag = 0;
+			iowrite32((1<<DMA_READ_START), ((void*)(address + DMA_READ_CTRL*4)));
+			timeDMAwait = wait_event_interruptible_timeout( sis8300dev->waitDMA, sis8300dev->waitFlag != 0, value );
+			do_gettimeofday(&(sis8300dev->dma_stop_time));
+			if(!sis8300dev->waitFlag){
+				tmp_data_32       = ioread32((void*)(address + DMA_READ_CTRL*4)); 
+				smp_rmb();
+				 for(dma_done_count = 0; dma_done_count < 2000; ++dma_done_count){
+							 udelay(20);
+							tmp_data_32 = 0;
+							tmp_data_32       = ioread32((void*)(address + DMA_READ_CTRL*4)); 
+							smp_rmb();
+							if(!(tmp_data_32 & 0x1)) break;
+				}
+				if(tmp_data_32 & 0x1){
+					printk (KERN_ALERT "SIS8300_READ_DMA:SLOT NUM %i NO INTERRUPT \n", dev->slot_num);
+					sis8300dev->waitFlag = 1;
+					iowrite32(0xFFFFFFFF, ((void*)(address + IRQ_CLEAR*4)));
+					smp_wmb();
+					udelay(5);
+					mutex_unlock(&dev->dev_mut);
+					return EFAULT;
+				}    
+			}
+			
+			if (copy_to_user ((device_ioctrl_dma *)arg, &dma_data, (size_t)io_dma_size)) {
+				retval = -EFAULT;
+				printk (KERN_ALERT "SIS8300_WRITE_DMA_2PEER: SLOT NUM %i COULD NOT COPY TO USER\n", dev->slot_num);
+			}
+			iowrite32(0xFFFFFFFF, ((void*)(address + IRQ_CLEAR*4)));
+			smp_wmb();
+			udelay(5);
+			break;
+			
         default:
 		   mutex_unlock(&dev->dev_mut);
             return -ENOTTY;

@@ -111,7 +111,7 @@ static int __devinit sis8300_probe(struct pci_dev *dev, const struct pci_device_
         sis8300_dev_pp->parent_dev  = sis8300_cdev_m->pciedev_dev_m[tmp_brd_num];
         init_waitqueue_head(&sis8300_dev_pp->waitDMA);
         pciedev_set_drvdata(sis8300_cdev_m->pciedev_dev_m[tmp_brd_num], sis8300_dev_p[tmp_brd_num]);
-        pciedev_setup_interrupt(sis8300_interrupt, sis8300_cdev_m->pciedev_dev_m[tmp_brd_num], SIS8300DEVNAME); 
+        pciedev_setup_interrupt(sis8300_interrupt, sis8300_cdev_m->pciedev_dev_m[tmp_brd_num], SIS8300DEVNAME, 0); 
         
         /*****Switch ON USER_LED*****/
         //address = sis8300_cdev_m->pciedev_dev_m[tmp_brd_num]->memmory_base0;

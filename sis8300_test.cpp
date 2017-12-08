@@ -109,6 +109,7 @@ int main(int argc, char* argv[])
         printf("\n CTRL_DMA READ (30) CTRL_DMA WRITE (31) ?-");
         printf("\n CTRL_DMA READ in LOOP (32))?-");
         printf("\n CTRL_DMA READ STAT (33) CTRL_DMA READ in LOOP STAT (34)?-");
+        printf("\n PEER2PEER DMA (35))?-");
         printf("\n READ DAC0 FILE (40) READ DAC1 FILE (41) SET SPECTRUM (42)?-");
         printf("\n END (11) ?-");
         scanf("%d",&ch_in);
@@ -587,7 +588,7 @@ switch (ch_in){
             }
             // disable ddr2 test write interface
             myReg.offset = DDR2_ACCESS_CONTROL;
-            myReg.data = 0;
+            myReg.data = 1;
             ioctl(fd, SIS8300_REG_WRITE, &myReg);  
             
             if(tmp_offset == 0xB0000000){
@@ -839,6 +840,74 @@ switch (ch_in){
                 
                 if(tmp_dma_buf) delete tmp_dma_buf;
                 break;
+				
+	case 35 :
+                DMA_RW.dma_offset  = 0;
+                DMA_RW.dma_size    = 0;
+                DMA_RW.dma_cmd     = 0;
+                DMA_RW.dma_pattern = 0; 
+				
+	            printf ("\n INPUT COMAND (0-get address from universal driver, 3 use OFFSET as adress)  -");
+                scanf ("%d",&tmp_data);
+                fflush(stdin);
+                DMA_RW.dma_cmd = tmp_data;
+				
+                printf ("\n INPUT  DMA_SIZE (num of sumples (int))  -");
+                scanf ("%d",&tmp_size);
+                fflush(stdin);
+                DMA_RW.dma_size    = sizeof(int)*tmp_size;
+				
+                printf ("\n INPUT OSURCE OFFSET (HEX)  -");
+                scanf ("%x",&tmp_offset);
+                fflush(stdin);
+                DMA_RW.dma_offset = tmp_offset;
+                
+                printf ("\n INPUT DEST OFFSET (HEX)  -");
+                scanf ("%x",&tmp_offset);
+                fflush(stdin);
+                DMA_RW.dma_reserved2 = tmp_offset;
+	      
+	            printf ("\n INPUT  PERR SLOT NUM  -");
+                scanf ("%d",&tmp_mode);
+                fflush(stdin);
+                DMA_RW.dma_reserved1    = (tmp_mode << 16) & 0xFFFF0000;
+				
+                printf ("\n INPUT PEER BAR NUM  -");
+                scanf ("%d",&tmp_barx);
+                fflush(stdin);
+                DMA_RW.dma_reserved1 += (tmp_barx & 0xFFFF);
+                
+				
+		
+                printf ("SLOT - %i, BAR %i OFFSET %X DMA_SIZE - %X\n", DMA_RW.dma_reserved1, DMA_RW.dma_reserved2, DMA_RW.dma_offset, DMA_RW.dma_size);
+                
+                // enable ddr2 test write interface
+                myReg.offset = DDR2_ACCESS_CONTROL;
+                myReg.data = (1<<DDR2_PCIE_TEST_ENABLE);
+                ioctl(fd, SIS8300_REG_WRITE, &myReg);  
+                
+                gettimeofday(&start_time, 0);
+                code = ioctl (fd, SIS8300_WRITE_DMA_2PEER, &DMA_RW);
+                gettimeofday(&end_time, 0);
+                printf ("===========READED  CODE %i\n", code);
+                time_tmp    =  MIKRS(end_time) - MIKRS(start_time);
+                time_dlt       =  MILLS(end_time) - MILLS(start_time);
+                printf("STOP READING TIME %fms : %fmks  SIZE %lu\n", time_dlt, time_tmp,(sizeof(int)*tmp_size));
+                printf("STOP READING KBytes/Sec %f\n",((sizeof(int)*tmp_size*1000)/time_tmp));
+                code = ioctl (fd, SIS8300_GET_DMA_TIME, &DMA_TIME);
+                if (code) {
+                    printf ("######ERROR GET TIME %d\n", code);
+                }
+                printf ("===========DRIVER TIME \n");
+                time_tmp = MIKRS(DMA_TIME.stop_time) - MIKRS(DMA_TIME.start_time);
+                time_dlt    = MILLS(DMA_TIME.stop_time) - MILLS(DMA_TIME.start_time);
+                printf("STOP DRIVER TIME START %li:%li STOP %li:%li\n",
+                                                            DMA_TIME.start_time.tv_sec, DMA_TIME.start_time.tv_usec, 
+                                                            DMA_TIME.stop_time.tv_sec, DMA_TIME.stop_time.tv_usec);
+                printf("STOP DRIVER READING TIME %fms : %fmks  SIZE %lu\n", time_dlt, time_tmp,(sizeof(int)*tmp_size));
+                printf("STOP DRIVER READING KBytes/Sec %f\n",((sizeof(int)*tmp_size*1000)/time_tmp));
+                break;
+				
         case 40:
 //            std::fstream dac0_file("/home/petros/doocs.git/doocs/server/common/sis8300dma/dac0_data.txt", std::ios_base::in);
 //            std::fstream dac1_file("/home/petros/doocs.git/doocs/server/common/sis8300dma/dac0_data.txt", std::ios_base::in);

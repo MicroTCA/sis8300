@@ -82,6 +82,7 @@ typedef struct t_sis8300_reg{
 #define SIS8300_MLVDS_REG           _IOWR(SIS8300_IOC, 53, int)
 #define SIS8300_BLINK_LED           _IOWR(SIS8300_IOC, 54, int)
 #define SIS8300_SAMPLE_ADDR_ALL         _IOWR(SIS8300_IOC, 55, int)
+#define SIS8300_WRITE_DMA_2PEER         _IOWR(SIS8300_IOC, 56, int)
 
 #define SIS8300_IOC_MAXNR           57
 #define SIS8300_IOC_MINNR           20
