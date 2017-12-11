@@ -3,18 +3,18 @@
 *
 *This file is part of SIS8300 driver.
 *
-*Foobar is free software: you can redistribute it and/or modify
+*SIS8300 is free software: you can redistribute it and/or modify
 *it under the terms of the GNU General Public License as published by
 *the Free Software Foundation, either version 3 of the License, or
 *(at your option) any later version.
 *
-*Foobar is distributed in the hope that it will be useful,
+*SIS8300 is distributed in the hope that it will be useful,
 *but WITHOUT ANY WARRANTY; without even the implied warranty of
 *MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 *GNU General Public License for more details.
 *
 *You should have received a copy of the GNU General Public License
-*along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+*along with SIS8300.  If not, see <http://www.gnu.org/licenses/>.
 **/
 
 /*
@@ -27,6 +27,7 @@
 #include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/timer.h>
+#include <linux/signal.h>
 
 #include "sis8300_fnc.h"
 #include "sis8300_defs.h"
@@ -34,7 +35,7 @@
 
 MODULE_AUTHOR("Lyudvig Petrosyan");
 MODULE_DESCRIPTION("SIS8300 board driver");
-MODULE_VERSION("6.0.0");
+MODULE_VERSION("7.0.0");
 MODULE_LICENSE("Dual BSD/GPL");
 
 pciedev_cdev     *sis8300_cdev_m = 0;
