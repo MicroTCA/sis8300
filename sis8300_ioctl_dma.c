@@ -24,7 +24,7 @@
 
 #include <linux/types.h>
 #include <linux/timer.h>
-#include <asm/uaccess.h>
+//#include <asm/uaccess.h>
 #include <linux/sched.h>
 #include <linux/dma-mapping.h>
 #include <linux/mm.h>
@@ -1399,17 +1399,12 @@ long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long
             iowrite32(tmp_source_address, ((void*)(address + DMA_READ_SRC_ADR_LO32*4)));
 			
             tmp_data_32         = dma_sys_addr;
-	 //tmp_data_32         = 0xB8340004;
             iowrite32(tmp_data_32, ((void*)(address + DMA_READ_DST_ADR_LO32*4)));
             smp_wmb();
-            //printk (KERN_ALERT "SIS8300_READ_DMA: DEST ADDRESS %X\n", tmp_data_32);
             dma_sys_addr       = (u32)((pTmpDmaHandle >> 32) & 0xFFFFFFFF);
             tmp_data_32         = dma_sys_addr;
-	 //tmp_data_32         = 0xB8320000;
-	 // tmp_data_32         = 0x0;
             iowrite32(tmp_data_32, ((void*)(address + DMA_READ_DST_ADR_HI32*4)));
             smp_wmb();
-			//printk (KERN_ALERT "SIS8300_READ_DMA: DEST ADDRESS %X\n", tmp_data_32);
             iowrite32(tmp_dma_trns_size, ((void*)(address + DMA_READ_LEN*4)));
             smp_wmb();
             iowrite32(0xFFFF0000, ((void*)(address + IRQ_ENABLE*4)));
@@ -1425,15 +1420,17 @@ long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long
             timeDMAwait = wait_event_interruptible_timeout( sis8300dev->waitDMA, sis8300dev->waitFlag != 0, value );
             do_gettimeofday(&(sis8300dev->dma_stop_time));
             if(!sis8300dev->waitFlag){
+				printk (KERN_ALERT "SIS8300_READ_DMA:SLOT NUM %i NO INTERRUPT 0 \n", dev->slot_num);
                 tmp_data_32       = ioread32((void*)(address + DMA_READ_CTRL*4)); 
                 smp_rmb();
                  for(dma_done_count = 0; dma_done_count < 2000; ++dma_done_count){
-			                 udelay(20);
-		                	tmp_data_32 = 0;
-		                 	tmp_data_32       = ioread32((void*)(address + DMA_READ_CTRL*4)); 
-                            smp_rmb();
-			                if(!(tmp_data_32 & 0x1)) break;
-		        }
+					 printk (KERN_ALERT "SIS8300_READ_DMA:SLOT NUM %i NO INTERRUPT COUNT %i \n", dev->slot_num, dma_done_count);
+			 udelay(20);
+			tmp_data_32 = 0;
+			tmp_data_32       = ioread32((void*)(address + DMA_READ_CTRL*4)); 
+			smp_rmb();
+			if(!(tmp_data_32 & 0x1)) break;
+		}
                 if(tmp_data_32 & 0x1){
                     printk (KERN_ALERT "SIS8300_READ_DMA:SLOT NUM %i NO INTERRUPT \n", dev->slot_num);
                     sis8300dev->waitFlag = 1;
@@ -1446,6 +1443,7 @@ long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long
                     return EFAULT;
                 }    
             }
+		//printk (KERN_ALERT "SIS8300_READ_DMA:SLOT NUM %i START UNMAP \n", dev->slot_num);	
             pci_unmap_single(pdev, pTmpDmaHandle, tmp_dma_trns_size, PCI_DMA_FROMDEVICE);
             if (copy_to_user ((void *)arg, pWriteBuf, tmp_dma_size)) {
                 retval = -EFAULT;
@@ -1466,7 +1464,8 @@ long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long
                 printk (KERN_ALERT "SIS8300_WRITE_DMA: COULD NOT COPY FROM USER\n");
                 return retval;
             }
-            value    = HZ/1; /* value is given in jiffies*/
+	 // value  = 10000*HZ/20000; /* value is given in jiffies*/
+           value    = HZ/1; /* value is given in jiffies*/
             tmp_dma_size           = dma_data.dma_size;
             tmp_dma_offset        = dma_data.dma_offset;
             if(tmp_dma_size <= 0){
@@ -1492,7 +1491,7 @@ long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long
             tmp_source_address = tmp_dma_offset;
             if (copy_from_user(pWriteBuf, ((u_int*)arg + DMA_DATA_OFFSET), (size_t)length)) {
                 retval = -EFAULT;
-                pci_unmap_single(pdev, pTmpDmaHandle, tmp_dma_trns_size, PCI_DMA_TODEVICE);
+                //pci_unmap_single(pdev, pTmpDmaHandle, tmp_dma_trns_size, PCI_DMA_TODEVICE);
                 free_pages((ulong)pWriteBuf, (ulong)sis8300dev->dma_page_order);
                 mutex_unlock(&dev->dev_mut);
                 return retval;
@@ -1501,7 +1500,6 @@ long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long
             tmp_source_address = tmp_dma_offset;
             iowrite32(tmp_source_address, ((void*)(address + DMA_WRITE_DST_ADR_LO32*4)));
             dma_sys_addr       = (u32)(pTmpDmaHandle & 0xFFFFFFFF);
-	//dma_sys_addr         = 0xB8320000;
             iowrite32(dma_sys_addr, ((void*)(address + DMA_WRITE_SRC_ADR_LO32*4)));
             dma_sys_addr       = (u32)((pTmpDmaHandle >> 32) & 0xFFFFFFFF);
             iowrite32(dma_sys_addr, ((void*)(address + DMA_WRITE_SRC_ADR_HI32*4)));
@@ -1519,6 +1517,29 @@ long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long
             do_gettimeofday(&(sis8300dev->dma_stop_time));
             if(!sis8300dev->waitFlag){
                 printk (KERN_ALERT "SIS8300_WRITE_DMA: NO INTERRUPT\n");
+	      tmp_data_32       = ioread32((void*)(address + DMA_WRITE_CTRL*4)); 
+                smp_rmb();
+	      for(dma_done_count = 0; dma_done_count < 2000; ++dma_done_count){
+			 printk (KERN_ALERT "SIS8300_WRITE_DMA:SLOT NUM %i NO INTERRUPT COUNT %i \n", dev->slot_num, dma_done_count);
+			 udelay(20);
+			tmp_data_32 = 0;
+			tmp_data_32       = ioread32((void*)(address + DMA_WRITE_CTRL*4)); 
+			smp_rmb();
+			if(!(tmp_data_32 & 0x1)) break;
+		}
+	       if(tmp_data_32 & 0x1){
+			printk (KERN_ALERT "SIS8300_WRITE_DMA:SLOT NUM %i NO INTERRUPT \n", dev->slot_num);
+			sis8300dev->waitFlag = 1;
+			iowrite32(0xFFFFFFFF, ((void*)(address + IRQ_CLEAR*4)));
+			smp_wmb();
+			udelay(5);
+			pci_unmap_single(pdev, pTmpDmaHandle, tmp_dma_trns_size, PCI_DMA_TODEVICE);
+			free_pages((ulong)pWriteBuf, (ulong)sis8300dev->dma_page_order);
+			mutex_unlock(&dev->dev_mut);
+			return EFAULT;
+                }  
+				
+/*
                 sis8300dev->waitFlag = 1;
                 iowrite32(0xFFFFFFFF, ((void*)(address + IRQ_CLEAR*4)));
                 smp_wmb();
@@ -1527,10 +1548,11 @@ long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long
                 free_pages((ulong)pWriteBuf, (ulong)sis8300dev->dma_page_order);
                 mutex_unlock(&dev->dev_mut);
                 return EFAULT;
+*/
             }
             pci_unmap_single(pdev, pTmpDmaHandle, tmp_dma_trns_size, PCI_DMA_TODEVICE);
             free_pages((ulong)pWriteBuf, (ulong)sis8300dev->dma_page_order);
-            //iowrite32(0xFFFFFFFF, ((void*)(address + IRQ_CLEAR*4)));
+            iowrite32(0xFFFFFFFF, ((void*)(address + IRQ_CLEAR*4)));
             smp_wmb();
             udelay(2);
             break;

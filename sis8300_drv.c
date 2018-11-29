@@ -35,7 +35,7 @@
 
 MODULE_AUTHOR("Lyudvig Petrosyan");
 MODULE_DESCRIPTION("SIS8300 board driver");
-MODULE_VERSION("7.0.0");
+MODULE_VERSION("7.1.0");
 MODULE_LICENSE("Dual BSD/GPL");
 
 pciedev_cdev     *sis8300_cdev_m = 0;
@@ -84,6 +84,9 @@ static irqreturn_t sis8300_interrupt(int irq, void *dev_id)
     address = pciedev_get_baraddress(BAR0, pdev);
     
     intreg       = ioread32(address + IRQ_STATUS*4);
+	
+	//printk(KERN_ALERT "SIS8300-PCIEDEV_GET INT IRQ_STATUS %X \n", intreg);
+	
     smp_rmb();
      if(intreg == 0){
         return IRQ_NONE;

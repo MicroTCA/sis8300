@@ -35,6 +35,8 @@
 #include <setjmp.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <math.h>
+#include <stdint.h>
 
 #include <iostream>
 #include <fstream>
@@ -133,7 +135,7 @@ int main(int argc, char* argv[])
         printf("\n CTRL_DMA READ (30) CTRL_DMA WRITE (31) ?-");
         printf("\n CTRL_DMA READ in LOOP (32))?-");
         printf("\n CTRL_DMA READ STAT (33) CTRL_DMA READ in LOOP STAT (34)?-");
-        printf("\n PEER2PEER DMA (35))?-");
+        printf("\n PEER2PEER DMA (35) )?-");
         printf("\n READ DAC0 FILE (40) READ DAC1 FILE (41) SET SPECTRUM (42)?-");
         printf("\n END (11) ?-");
         scanf("%d",&ch_in);
@@ -588,18 +590,24 @@ switch (ch_in){
                 printf ("\n INPUT PATTERN DAC01 REST (HEX)  -");
                 scanf ("%x",&tmp_pattern4);
                 fflush(stdin);
-                for(int ii = (tmp_pattern + 0); ii < (tmp_pattern + 20); ++ii){
-                    tmp_write_buf[ii + DMA_DATA_OFFSET] =tmp_pattern1;
-                }
-                for(int ii = (tmp_pattern + 20); ii < (tmp_pattern + 40); ++ii){
-                    tmp_write_buf[ii + DMA_DATA_OFFSET] =tmp_pattern2;
-                }
-                for(int ii = (tmp_pattern + 40); ii < (tmp_pattern + 60); ++ii){
-                    tmp_write_buf[ii + DMA_DATA_OFFSET] =tmp_pattern3;
-                }
-                for(int ii = (tmp_pattern + 60); ii < tmp_size; ++ii){
-                    tmp_write_buf[ii + DMA_DATA_OFFSET] = tmp_pattern4;
-                }
+	      if(tmp_pattern != 3){
+			for(int ii = (tmp_pattern + 0); ii < (tmp_pattern + 20); ++ii){
+				tmp_write_buf[ii + DMA_DATA_OFFSET] =tmp_pattern1;
+			}
+			for(int ii = (tmp_pattern + 20); ii < (tmp_pattern + 40); ++ii){
+				tmp_write_buf[ii + DMA_DATA_OFFSET] =tmp_pattern2;
+			}
+			for(int ii = (tmp_pattern + 40); ii < (tmp_pattern + 60); ++ii){
+				tmp_write_buf[ii + DMA_DATA_OFFSET] =tmp_pattern3;
+			}
+			for(int ii = (tmp_pattern + 60); ii < tmp_size; ++ii){
+				tmp_write_buf[ii + DMA_DATA_OFFSET] = tmp_pattern4;
+			}
+	      }else{
+			for(int ii = 1; ii < tmp_size; ++ii){
+				tmp_write_buf[ii + DMA_DATA_OFFSET] = (int)(65535*sin(180 - 180/ii) + ((int)(65535*sin(180 - 180/ii))<<16));
+			}		
+		}
             }else{
                 for(int ii = 0; ii < tmp_size; ++ii){
                     tmp_write_buf[ii + DMA_DATA_OFFSET] = ((tmp_pattern + ii) & 0xFFFF) + (((tmp_pattern + ii) & 0xFFFF)<< 16);
@@ -612,10 +620,15 @@ switch (ch_in){
             }
             // disable ddr2 test write interface
             myReg.offset = DDR2_ACCESS_CONTROL;
-            myReg.data = 1;
+           myReg.data = 1;
+	 //myReg.data = 0;
             ioctl(fd, SIS8300_REG_WRITE, &myReg);  
-            
+			
             if(tmp_offset == 0xB0000000){
+	     myReg.offset = DDR2_ACCESS_CONTROL;
+	     myReg.data = 1;
+               ioctl(fd, SIS8300_REG_WRITE, &myReg);  
+				
                 printf("WRITING TO DAC RAM\n");
                 /* DAC Reset */
                 printf("Reset DAC...               ");
@@ -625,7 +638,10 @@ switch (ch_in){
                 printf("OK\n");
                 /* Setup DAC Values */
                 printf("Setup DAC Values...        ");
-                myReg.offset = DDR2_ACCESS_CONTROL;
+				
+				
+	     
+                myReg.offset = SIS8300_DAC_CONTROL_REG;
                 myReg.data = 0x123;
                 ioctl(fd, SIS8300_REG_WRITE, &myReg);  
                 myReg.offset = DMA_WRITE_DST_ADR_LO32;
@@ -694,7 +710,8 @@ switch (ch_in){
                 time_tmp    =  MIKRS(end_time) - MIKRS(start_time);
                 time_dlt       =  MILLS(end_time) - MILLS(start_time);
                 printf("STOP READING TIME %fms : %fmks  SIZE %lu\n", time_dlt, time_tmp,(sizeof(int)*tmp_size));
-                printf("STOP READING KBytes/Sec %f\n",((sizeof(int)*tmp_size*1000*tmp_loop)/time_tmp));
+                printf("STOP READING KBytes/Sec %f\n",((sizeof(int)*tmp_size*1000)/time_tmp));
+	      printf("STOP READING PER LOOP KBytes/Sec %f\n",((sizeof(int)*tmp_size*1000*tmp_loop)/time_tmp));
                 code = ioctl (fd, SIS8300_GET_DMA_TIME, &DMA_TIME);
                 if (code) {
                     printf ("######ERROR GET TIME %d\n", code);
@@ -821,46 +838,54 @@ switch (ch_in){
                 time_tmp_loop_drv      = 0;
                 time_tmp_loop_dlt_drv = 0;
                 
-                for(k = 0 ; k <= 1000; k++){
-                     //usleep(2);
-                    gettimeofday(&start_time, 0);
-                    for(int i = 0; i < tmp_loop; i++){
-                            DMA_RW.dma_offset  = 0;
-                            DMA_RW.dma_size    = 0;
-                            DMA_RW.dma_cmd     = 0;
-                            DMA_RW.dma_pattern = 0; 
+		
+		for(int i = 0; i < tmp_loop; i++){
+			DMA_RW.dma_offset  = 0;
+			DMA_RW.dma_size    = 0;
+			DMA_RW.dma_cmd     = 0;
+			DMA_RW.dma_pattern = 0; 
 
-                            DMA_RW.dma_size    = sizeof(int)*tmp_size;
-                            DMA_RW.dma_offset = tmp_offset + sizeof(int)*tmp_size*i;
-                            memcpy(tmp_dma_buf, &DMA_RW, sizeof (device_ioctrl_dma));
-                            code = ioctl (fd, SIS8300_READ_DMA, tmp_dma_buf);
+			DMA_RW.dma_size    = sizeof(int)*tmp_size;
+			DMA_RW.dma_offset = tmp_offset + sizeof(int)*tmp_size*i;
+			memcpy(tmp_dma_buf, &DMA_RW, sizeof (device_ioctrl_dma));
+			gettimeofday(&start_time, 0);
+				code = ioctl (fd, SIS8300_READ_DMA, tmp_dma_buf);
+			gettimeofday(&end_time, 0);
+			time_tmp    =  MIKRS(end_time) - MIKRS(start_time);
+			time_dlt       =  MILLS(end_time) - MILLS(start_time);
+			
+			printf("STOP READING TIME %fms : %fmks  SIZE %lu\n", time_dlt, time_tmp,(sizeof(int)*tmp_size));
+			printf("STOP READING KBytes/Sec %f\n",((sizeof(int)*tmp_size*1000)/time_tmp));
+		
+			time_tmp_loop        += time_tmp;
+			time_tmp_loop_dlt  += time_dlt;
+			code = ioctl (fd, SIS8300_GET_DMA_TIME, &DMA_TIME);
+			if (code) {
+				printf ("######ERROR GET TIME %d\n", code);
+			}
+			time_tmp = MIKRS(DMA_TIME.stop_time) - MIKRS(DMA_TIME.start_time);
+			time_dlt    = MILLS(DMA_TIME.stop_time) - MILLS(DMA_TIME.start_time);
+			
+			printf ("===========DRIVER TIME \n");
+			printf("STOP DRIVER READING TIME %fms : %fmks  SIZE %lu\n", time_dlt, time_tmp,(sizeof(int)*tmp_size));
+			printf("STOP DRIVER READING KBytes/Sec %f\n",((sizeof(int)*tmp_size*1000)/time_tmp));
+		
+			time_tmp_loop_drv        += time_tmp;
+			time_tmp_loop_dlt_drv  += time_dlt;
+			usleep(200000);
 
-                        }
-                    gettimeofday(&end_time, 0);
-                    time_tmp    =  MIKRS(end_time) - MIKRS(start_time);
-                    time_dlt       =  MILLS(end_time) - MILLS(start_time);
-                    time_tmp_loop        += time_tmp;
-                    time_tmp_loop_dlt  += time_dlt;
-                   code = ioctl (fd, SIS8300_GET_DMA_TIME, &DMA_TIME);
-                    if (code) {
-                        printf ("######ERROR GET TIME %d\n", code);
-                    }
-                    time_tmp = MIKRS(DMA_TIME.stop_time) - MIKRS(DMA_TIME.start_time);
-                    time_dlt    = MILLS(DMA_TIME.stop_time) - MILLS(DMA_TIME.start_time);
-                    time_tmp_loop_drv        += time_tmp;
-                    time_tmp_loop_dlt_drv  += time_dlt;
-                    usleep(2000);
-                 }
-                time_tmp_loop                = time_tmp_loop/1000;
-                time_tmp_loop_dlt          = time_tmp_loop_dlt/1000;
-                 time_tmp_loop_drv        = time_tmp_loop_drv/1000;
-                time_tmp_loop_dlt_drv  = time_tmp_loop_dlt_drv/1000;
-                
-                printf("STOP READING TIME %fms : %fmks  SIZE %lu\n", time_tmp_loop_dlt, time_tmp_loop,(sizeof(int)*tmp_size));
-                printf("STOP READING KBytes/Sec %f\n",((sizeof(int)*tmp_size*1000*tmp_loop)/time_tmp_loop));
-                 printf ("===========DRIVER TIME \n");
-               printf("STOP DRIVER READING TIME %fms : %fmks  SIZE %lu\n", time_tmp_loop_dlt_drv, time_tmp_loop_drv,(sizeof(int)*tmp_size));
-                printf("STOP DRIVER READING KBytes/Sec %f\n",((sizeof(int)*tmp_size*1000)/time_tmp_loop_drv));
+		}
+					
+		time_tmp_loop                = time_tmp_loop/tmp_loop;
+		time_tmp_loop_dlt          = time_tmp_loop_dlt/tmp_loop;
+		time_tmp_loop_drv        = time_tmp_loop_drv/tmp_loop;
+		time_tmp_loop_dlt_drv  = time_tmp_loop_dlt_drv/tmp_loop;
+
+		printf("STOP READING TIME %fms : %fmks  SIZE %lu\n", time_tmp_loop_dlt, time_tmp_loop,(sizeof(int)*tmp_size));
+		printf("STOP READING KBytes/Sec %f\n",((sizeof(int)*tmp_size*1000)/time_tmp_loop));
+		printf ("===========DRIVER TIME \n");
+		printf("STOP DRIVER READING TIME %fms : %fmks  SIZE %lu\n", time_tmp_loop_dlt_drv, time_tmp_loop_drv,(sizeof(int)*tmp_size));
+		printf("STOP DRIVER READING KBytes/Sec %f\n",((sizeof(int)*tmp_size*1000)/time_tmp_loop_drv));
                 
                 if(tmp_dma_buf) delete tmp_dma_buf;
                 break;
