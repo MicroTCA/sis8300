@@ -115,15 +115,18 @@ long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long
     d_num           = dev->dev_num;	
     cur_proc       = current->group_leader->pid;
     
+     //printk (KERN_ALERT "@@@@@@@@@@@@@@@SIS8300_READ_DMA: START DMA READ CMD %i:%i:%i\n", 
+     //                                                          cmd, SIS8300_READ_DMA, PCIEDEV_READ_DMA);
+    
     if(!dev->dev_sts){
-        printk("SIS8300_IOCTL_DMA: NO DEVICE %d\n", dev->dev_num);
+        printk(KERN_ALERT  "SIS8300_IOCTL_DMA: NO DEVICE %d\n", dev->dev_num);
         retval = -EFAULT;
         return retval;
     }
     
     address = pciedev_get_baraddress(BAR0, dev);
     if(!address){
-        printk("SIS8300_IOCTL_DMA: NO MEMORY\n");
+        printk(KERN_ALERT  "SIS8300_IOCTL_DMA: NO MEMORY\n");
         retval = -EFAULT;
         return retval;
     }
@@ -137,8 +140,10 @@ long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long
     address = dev->memmory_base0;
 */
     
-    if (mutex_lock_interruptible(&dev->dev_mut))
+    if (mutex_lock_interruptible(&dev->dev_mut)){
+        printk(KERN_ALERT  "SIS8300_IOCTL_DMA: NO MUTEX\n");
         return -ERESTARTSYS;
+	}
     
     switch (cmd) {
         case SIS8300_DMA_OFFSET:
@@ -1352,7 +1357,7 @@ long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long
             break;
          case PCIEDEV_READ_DMA:
          case SIS8300_READ_DMA:
-			 //printk (KERN_ALERT "SIS8300_READ_DMA: START DMA READ\n");
+			 //printk (KERN_ALERT "##############SIS8300_READ_DMA: START DMA READ\n");
             retval = 0;
             if (copy_from_user(&dma_data, (device_ioctrl_dma*)arg, (size_t)io_dma_size)) {
                 retval = -EFAULT;
@@ -1559,7 +1564,7 @@ long     sis8300_ioctl_dma(struct file *filp, unsigned int *cmd_p, unsigned long
 			
 		case PCIEDEV_WRITE_DMA_P2P:
 		case SIS8300_WRITE_DMA_2PEER:
-			 printk (KERN_ALERT "SIS8300_WRITE_DMA_2PEER: START PEER WRITE\n");
+			 //printk (KERN_ALERT "SIS8300_WRITE_DMA_2PEER: START PEER WRITE\n");
 			 
 		/*
 			u_int    p2p_slot;

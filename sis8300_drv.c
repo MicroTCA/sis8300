@@ -258,21 +258,28 @@ static long  sis8300_ioctl(struct file *filp, unsigned int cmd, unsigned long ar
 {
     long result = 0;
     
+    //printk (KERN_ALERT "SIS8300_READ_DMA: START DMA READ 0\n");
     if (_IOC_TYPE(cmd) == PCIEDOOCS_IOC){
+		//printk (KERN_ALERT "SIS8300_READ_DMA: START DMA READ 1\n");
         if (_IOC_NR(cmd) <= PCIEDOOCS_IOC_MAXNR && _IOC_NR(cmd) >= PCIEDOOCS_IOC_MINNR) {
-            result = pciedev_ioctl_exp(filp, &cmd, &arg, sis8300_cdev_m);
-        }else{
-            if (_IOC_NR(cmd) <= PCIEDOOCS_IOC_DMA_MAXNR && _IOC_NR(cmd) >= PCIEDOOCS_IOC_DMA_MINNR) {
+			if (_IOC_NR(cmd) <= PCIEDOOCS_IOC_DMA_MAXNR && _IOC_NR(cmd) >= PCIEDOOCS_IOC_DMA_MINNR) {
+				//printk (KERN_ALERT "SIS8300_READ_DMA: START DMA READ 3\n");
                 result = sis8300_ioctl_dma(filp, &cmd, &arg);
             }else{
+			//printk (KERN_ALERT "SIS8300_READ_DMA: START DMA READ 2\n");
+            result = pciedev_ioctl_exp(filp, &cmd, &arg, sis8300_cdev_m);
+		  }
+        }else{
                 if (_IOC_NR(cmd) <= SIS8300_IOC_MAXNR && _IOC_NR(cmd) >= SIS8300_IOC_MINNR) {
+					//printk (KERN_ALERT "SIS8300_READ_DMA: START DMA READ 4\n");
                         result = sis8300_ioctl_dma(filp, &cmd, &arg);
                     }else{
+						//printk (KERN_ALERT "SIS8300_READ_DMA: START DMA READ WRONG ICTL CMD 0\n");
                         return -ENOTTY;
                     }
             }
-        }
     }else{
+		//printk (KERN_ALERT "SIS8300_READ_DMA: START DMA READ WRONG ICTL CMD 0\n");
          return -ENOTTY;
     }
     return result;
