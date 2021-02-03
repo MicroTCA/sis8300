@@ -1,0 +1,16 @@
+Source: sis8300-dkms
+Section: contrib/kernel
+Priority: extra
+Maintainer: Ludwig Petrosyan <lyudvig.petrosyan@desy.de>
+Build-Depends: debhelper (>= 7), dkms
+Standards-Version: 1.0.52
+
+Package: sis8300-dkms
+Architecture: all
+Depends: ${misc:Depends}, dkms, upciedev-dkms
+Description: kernel module for sis8300
+ PCIExpress Device Driver for uTCA
+ .
+ This package contains the dkms sources. When installed, it will build
+ the module for your kernel.
+ DOOCS-EXTERN

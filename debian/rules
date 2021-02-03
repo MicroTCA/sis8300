@@ -1,0 +1,19 @@
+#!/usr/bin/make -f
+
+VERSION=$(shell dpkg-parsechangelog |grep ^Version:|cut -d ' ' -f 2)
+
+%:
+	dh $@ --with dkms
+    
+override_dh_auto_build:
+    :
+
+override_dh_auto_install:
+	dh_install sis8300_drv.c  sis8300_fnc.h  sis8300_reg.h  sis8300_ioctl_dma.c /usr/src/sis8300-$(VERSION)/
+	dh_install sis8300_defs.h sis8300_test.cpp sis8300.map Makefile /usr/src/sis8300-$(VERSION)/
+	dh_install 10-sis8300.rules /etc/udev/rules.d/
+
+override_dh_dkms:
+	dh_dkms -V $(VERSION) 
+
+	
