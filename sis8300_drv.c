@@ -35,7 +35,7 @@
 
 MODULE_AUTHOR("Lyudvig Petrosyan");
 MODULE_DESCRIPTION("SIS8300 board driver");
-MODULE_VERSION("7.1.0");
+MODULE_VERSION("9.0.0");
 MODULE_LICENSE("Dual BSD/GPL");
 
 pciedev_cdev     *sis8300_cdev_m = 0;
@@ -148,8 +148,10 @@ static int __devinit sis8300_probe(struct pci_dev *dev, const struct pci_device_
         /*Collect INFO*/
         tmp_info = ioread32(address + 0x0);
         smp_rmb();
+        sis8300_dev_pp->module_id=0;
         sis8300_cdev_m->pciedev_dev_m[tmp_brd_num]->brd_info_list.PCIEDEV_BOARD_ID = tmp_info;
         
+        sis8300_dev_pp->module_id=(tmp_info >> 16) & 0xFFFF;
         sis8300_dev_pp->fpga_1_gb =0;
         sis8300_dev_pp->dual_optical_interface = 0;
         sis8300_dev_pp->dual_port_14_15_interface = 0;
@@ -157,7 +159,7 @@ static int __devinit sis8300_probe(struct pci_dev *dev, const struct pci_device_
         sis8300_dev_pp->dual_channel_sampling = 0;
         sis8300_dev_pp->ringbuffer_delay = 0;
         sis8300_dev_pp->trigger_block_enable = 0;
-        tmp_info = ioread32(address + 0x0);
+        tmp_info = ioread32(address + SIS8300_FIRMWARE_OPTIONS_REG*4);
         smp_rmb();
         sis8300_dev_pp->sis8300_mem_max_size = 536870912;
         sis8300_dev_pp->fpga_1_gb = (tmp_info >> 8) & 0x1;
@@ -168,6 +170,8 @@ static int __devinit sis8300_probe(struct pci_dev *dev, const struct pci_device_
         sis8300_dev_pp->ringbuffer_delay = (tmp_info >> 1) & 0x1;
         sis8300_dev_pp->trigger_block_enable = tmp_info & 0x1;
         if(sis8300_dev_pp->fpga_1_gb ) sis8300_dev_pp->sis8300_mem_max_size = 1073741824;
+        //check if it is L 0r L2 default 2GB memory 0x8301, 0x8302, 0x8303 ...
+        if(sis8300_dev_pp->module_id > 0x8300) sis8300_dev_pp->sis8300_mem_max_size = 2147483648;
 /*
         sis8300_cdev_m->pciedev_dev_m[tmp_brd_num]->brd_info_list.PCIEDEV_BOARD_ID = (tmp_info >> 16) & 0xFFFF;
         sis8300_cdev_m->pciedev_dev_m[tmp_brd_num]->brd_info_list.PCIEDEV_BOARD_VERSION = (tmp_info >> 8)  & 0xFFFF;

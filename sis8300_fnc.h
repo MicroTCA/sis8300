@@ -63,6 +63,7 @@ struct sis8300_dev {
     int                          dual_channel_sampling;
     int                          ringbuffer_delay;
     int                          trigger_block_enable;
+    int                          module_id; //module identifier 
 };
 typedef struct sis8300_dev sis8300_dev;
 
